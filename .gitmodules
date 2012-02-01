@@ -1,0 +1,3 @@
+[submodule "cky"]
+	path = cky
+	url = git@github.com:mjpost/cky
