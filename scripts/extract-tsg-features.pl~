@@ -1,0 +1,77 @@
+#!/usr/bin/perl
+
+# computes TSG features from a TSG derivation
+
+use strict;
+use warnings;
+use List::Util qw/reduce max/;
+use TSG;
+
+my $feature = shift or die "need a feature!";
+if ($feature ne "heights" and $feature ne "terms" and $feature ne "trees") {
+  die "invalid feature!";
+}
+
+while (my $derivation = <>) {
+  chomp $derivation;
+  
+  if ($derivation eq "" or $derivation eq "(TOP)") {
+	print "\n";
+	next;
+  }
+
+  my @fragments;
+  my $tree = build_subtree($derivation);
+  extract_subtrees($tree, \@fragments);
+
+  my $subtree_count = 0;
+  my (%heights, %lexheights, %terms, %lexterms);
+  foreach my $str (@fragments) {
+	my $subtree = build_subtree($str);
+	$heights{makebin($subtree->{depth})}++;
+    $subtree_count++ if $subtree->{depth} > 1;
+
+    my @frontier = split(' ',$subtree->{frontier});
+    my $numterms = scalar @frontier;
+    my $numlex = scalar (grep /^_.*_$/, @frontier);
+    $terms{makebin($numterms)}++;
+    $lexterms{makebin($numlex)}++;
+
+    $lexheights{makebin($subtree->{depth})}++ if $numlex;
+  }
+
+  my $subtree_pct = 1.0 * $subtree_count / (scalar @fragments);
+  my @features;
+
+  if ($feature eq "heights") {
+	foreach my $key (keys %heights) {
+	  push @features, "heights/$key:$heights{$key}"
+	}
+	foreach my $key (keys %lexheights) {
+	  push @features, "lexheights/$key:$lexheights{$key}"
+	}
+  } elsif ($feature eq "terms") {
+	foreach my $key (keys %terms) {
+	  push @features, "terms/$key:$terms{$key}"
+	}
+	foreach my $key (keys %lexterms) {
+	  push @features, "lexterms/$key:$lexterms{$key}"
+	}
+  } elsif ($feature eq "trees") {
+	push @features, "trees:$subtree_count trees-pct:$subtree_pct";
+  }
+
+  print join(" ", @features) . "\n";
+}
+
+sub makebin {
+  my $num = shift;
+
+  if ($num <= 5) {
+	return $num;
+  } elsif ($num <= 10) {
+	return "6-10";
+  } else {
+	return "10+";
+  }
+}

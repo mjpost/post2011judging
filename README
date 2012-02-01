@@ -1,0 +1,110 @@
+Matt Post <post@cs.jhu.edu>
+January 30, 2012
+--
+
+This document describes how to repeat the experiments described in my 2011 paper,
+
+  @inproceedings{post2011judging,
+    Address = {Portland, Oregon, USA},
+    Author = {Post, Matt},
+    Booktitle = ACL2011,
+    Month = {June},
+    Title = {Judging Grammaticality with Tree Substitution Grammar Derivations},
+    Year = {2011},
+    url = {www.aclweb.org/anthology/P/P11/P11-2038.pdf}
+  }
+
+1. Download my code for building TSGs, which can be found on Github.
+   Note that you do not need to build your own TSG since this
+   repository includes the TSG I used in my experiments, but that code
+   contains a number of support scripts that you will need here.
+
+     git clone git@github.com:mjpost/dptsg.git
+
+   Then set the environment variable DPTST to point to that
+   directory.  In bash:
+
+     export DPTSG=$(pwd)/dptsg
+
+   Next, download my modifications to Mark Johnson's code for CKY
+   parsing.
+
+     git clone git@github.com:mjpost/cky.git
+
+   This code includes modifications I added to enable parsing
+   flattened versions of TSGs, to work with our black-box
+   parallelizer, and to incorporate some convenient command-line
+   options.
+
+2. Edit the file builddir.sh.  At the top, there are two environment
+   variables you need to define: (1) DPTSG (as above), and "basedir",
+   which should point to the directory containing this README file.
+
+     export basedir=$(pwd)
+
+3. Compile Mark Johnson's CKY code.  My version of this code contains
+   some modifications that enable it to parse TSG grammars.
+
+     make -C cky/
+
+4. To compute TSG features over a corpus, you need to parse the corpus
+   with the TSG grammar and then extract the TSG features from the
+   resulting derivations.  This requires a number of pre- and
+   post-processing steps which convert unknown words in the corpus,
+   flatten the TSG, parse with it, and expand it afterwards.  
+
+   All of this functionality is contained in the "builddir.sh"
+   script.  To run that script, you simply point it at a directory
+   which contains a single file named "words".  This file contains the
+   sentences of the corpus, one per line.
+
+     bash builddir.sh DIR
+
+   Alternately, you can pass the directory as an environment variable
+   (which makes it amenable to qsub).  e.g.,
+
+     qsub -v dir=DIR builddir.sh
+
+   As mentioned, in the directory DIR, builddir.sh expects to find a
+   file named "words", which contains the sentences to parse and
+   process, one per line.  It will then
+
+   - preprocess the file to mark and convert OOVs
+   - parse with the grammar
+   - restore the TSG fragments from the flattened versions the Johnson parser produces
+
+   Note that the script I've provided does sequential parsing of
+   sentences with at most 100 words.  Mark Johnson's CKY parser is
+   exhaustive, which makes it somewhat slow.  If you want to
+   parallelize the parsing you can use the included black-box
+   parallelizer (written by Adam Lopez).  You can enable this by
+   uncommenting out the appropriate line in builddir.sh, and
+   commenting out the sequential version.  You have to edit
+   environment/LocalConfig.pm to add your environment, which describes
+   how to call qsub.  If you want to use this, compile it by typing
+
+     make -C parallelize/
+
+5. When builddir.sh is done, the directory you passed it will contain
+   a number of files containing different feature sets.  These files
+   are all parallel to words, so that, for example, line 17 of each
+   file will correspond to the features extracted for sentence 17.
+   With respect to TSGs, the feature file you care about is "rules",
+   which contains counts of the TSG fragments used in the Viterbi
+   derivation of each sentence.  The format of this file is
+
+     fragment:count fragment:count ...
+
+  where "fragment" is a TSG fragment (collapsed to remove colons and
+  spaces) and "count" is a count of the number of times it was seen.
+  This facilitates conversion for toolkits such as SVM-light.
+
+6. You can convert to SVM-light format by calling the script
+   "tonumbers.pl", which converts the feature names to IDs and ensures
+   that they are sorted on each line.
+
+     cat rules | $basedir/scripts/tonumbers.pl
+
+--
+
+If you have any questions, please feel free to email me and ask.
