@@ -14,6 +14,14 @@ This document describes how to repeat the experiments described in my 2011 paper
     url = {www.aclweb.org/anthology/P/P11/P11-2038.pdf}
   }
 
+It includes data and code used to extract TSG derivations and the
+Charniak & Johnson (2005) feature set, plus the environment used to
+evaluate arbitrary feature sets in a simple, extendable way.  Due to
+LDC licensing restrictions, it does not include the data splits that
+we used for our experiments.  If you wish to have those splits and
+have the appropriate LDC license, please email me, and I'll send them
+to you.
+
 1. Download my code for building TSGs, which can be found on Github.
    Note that you do not need to build your own TSG since this
    repository includes the TSG I used in my experiments, but that code
@@ -99,11 +107,66 @@ This document describes how to repeat the experiments described in my 2011 paper
   spaces) and "count" is a count of the number of times it was seen.
   This facilitates conversion for toolkits such as SVM-light.
 
-6. You can convert to SVM-light format by calling the script
-   "tonumbers.pl", which converts the feature names to IDs and ensures
-   that they are sorted on each line.
+6. My classification environment relies on six data sets: positive and
+   negative training, development, and test data.  As described in the
+   paper, training proceeds on the training data.  Dev is used to tune
+   the regularization parameter, and the best model is then used to
+   score the test set.
 
-     cat rules | $basedir/scripts/tonumbers.pl
+   The training and evaluation script is eval.sh.  It assumes the
+   existence of the following six directories that correspond to the
+   six data sets just described.
+
+     train/good
+     train/bad
+     dev/good
+     dev/bad
+     test/good
+     test/bad
+
+   The script is called with
+
+     ./eval.sh FEATURE1 FEATURE2 FEATURE3 ...
+
+   It then searches for a file named FEATURE1 in *each* of the six
+   directories.  Each of these files contains a single training or
+   testing example, with any number of feature:value pairs on each
+   line, corresponding to the features extracted for that sentence or
+   training instance.  For example, the following invocation:
+
+     ./eval.sh sentlens rules
+
+   Would look for files {train,dev,test}/{good,bad}/{sentlens,rules}.
+   The sentlens file would have something like
+
+     sentlen:34
+     sentlen:25
+     ...
+
+   And the "rules" file is as described above.  The eval.sh script
+   constructs files usable by liblinear in a directory named
+   "run.FEATURE1+FEATURE2+...".
+
+   The main thing to note in adding your own features is that each
+   file must contain feature:value pairs, and the feature names should
+   be globally unique.
+
+7. The builddir.sh script described above can be used to easily
+   produce feature sets.  Just create the six directories, and within
+   each, create a file "words" that contains the sentences.  Then
+   call:
+
+     ./builddir.sh train/good
+     ./builddir.sh train/bad
+     ./builddir.sh dev/good
+     ./builddir.sh dev/bad
+     ./builddir.sh test/good
+     ./builddir.sh test/bad
+
+8. Download liblinear from
+   http://www.csie.ntu.edu.tw/~cjlin/liblinear/ .  Then edit the
+   variables "train" and "predict" at the top of eval.sh to point to
+   the liblinear binaries.
 
 --
 
